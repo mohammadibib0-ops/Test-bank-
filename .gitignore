@@ -1,0 +1,7 @@
+node_modules/
+.dev.vars
+.env
+*.secret
+worker/data/question-bank.json
+cost-bank-cloudflare-secrets.txt
+.DS_Store
