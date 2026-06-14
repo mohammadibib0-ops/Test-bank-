@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>إدارة بنك أسئلة محاسبة التكاليف</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+  <section id="adminLogin" class="admin-login">
+    <form id="adminLoginForm" class="login-card">
+      <span class="eyebrow dark">لوحة المدرس</span>
+      <h2>تسجيل دخول الإدارة</h2>
+      <label>كلمة المرور
+        <input id="adminPassword" type="password" required autocomplete="current-password">
+      </label>
+      <button id="adminLoginBtn" class="btn primary">دخول</button>
+      <div id="adminLoginMsg" class="message hidden"></div>
+    </form>
+  </section>
+
+  <div id="adminApp" class="admin-app hidden">
+    <header class="admin-header">
+      <div><span class="eyebrow">لوحة المدرس</span><h1>إدارة الأكواد والأجهزة</h1></div>
+      <div class="admin-actions"><a class="btn secondary" href="index.html">نسخة الطالب</a><button id="adminLogout" class="btn ghost">خروج</button></div>
+    </header>
+    <main class="admin-main">
+      <section id="statsGrid" class="stats-grid"></section>
+
+      <section class="admin-panel">
+        <div class="panel-head-row"><div><h2>تهيئة بنك الأسئلة</h2><p class="muted">اختر ملف بنك الأسئلة الذي استلمته خارج GitHub، ثم استورده إلى قاعدة البيانات الآمنة.</p></div></div>
+        <div class="seed-row"><input id="bankFile" type="file" accept="application/json,.json"><button id="seedBtn" class="btn primary">استيراد بنك الأسئلة</button></div>
+        <div id="seedMsg" class="message hidden"></div>
+      </section>
+
+      <section class="admin-panel">
+        <div class="panel-head-row"><div><h2>إنشاء أكواد تفعيل</h2><p class="muted">كل كود يرتبط بمفتاح جهاز واحد عند أول تفعيل.</p></div></div>
+        <div class="code-form-grid">
+          <label>عدد الأكواد<input id="codeCount" type="number" min="1" max="100" value="10"></label>
+          <label>وصف الدفعة<input id="codeLabel" maxlength="100" placeholder="مثال: شعبة 1 - صيف 2026"></label>
+          <label>تاريخ الانتهاء (اختياري)<input id="codeExpiry" type="datetime-local"></label>
+          <button id="generateBtn" class="btn primary">إنشاء الأكواد</button>
+        </div>
+        <div id="generatedBox" class="generated-box hidden"><div class="panel-head-row"><h3>الأكواد الجديدة - تظهر كاملة مرة واحدة</h3><button id="downloadCodes" class="btn secondary">تنزيل CSV</button></div><pre id="generatedCodes"></pre></div>
+      </section>
+
+      <section class="admin-panel">
+        <div class="panel-head-row"><div><h2>الأكواد المسجلة</h2><p class="muted">إعادة الربط تمسح مفتاح الجهاز الحالي وتسمح بتفعيل جهاز جديد.</p></div><button id="refreshBtn" class="btn secondary">تحديث</button></div>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>#</th><th>الكود</th><th>الدفعة</th><th>الطالب</th><th>الجهاز</th><th>الحالة</th><th>آخر دخول</th><th>إجراءات</th></tr></thead><tbody id="codesTable"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="config.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

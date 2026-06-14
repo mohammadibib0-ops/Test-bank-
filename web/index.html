@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173b57">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>بنك أسئلة محاسبة التكاليف</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="securityCurtain" class="security-curtain hidden"><div>تم إخفاء المحتوى مؤقتاً</div></div>
+  <div id="watermark" class="watermark-layer" aria-hidden="true"></div>
+
+  <section id="loginView" class="login-shell">
+    <div class="login-visual">
+      <div class="logo-mark">Σ</div>
+      <span class="eyebrow">محاسبة التكاليف</span>
+      <h1>بنك أسئلة تفاعلي<br>محمي بجهاز الطالب</h1>
+      <p>ثلاثة فصول، أسئلة مفاهيمية ومسائل حسابية، وتصحيح فوري بعد تسليم الاختبار.</p>
+      <div class="security-list">
+        <span>🔐 مفتاح جهاز غير قابل للاستخراج</span>
+        <span>🧩 كود واحد لجهاز واحد</span>
+        <span>🛡️ الإجابات الصحيحة محفوظة في الخادم</span>
+      </div>
+    </div>
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <div>
+        <span class="eyebrow dark">تفعيل الدخول</span>
+        <h2>أدخل بيانات الطالب</h2>
+        <p class="muted">عند أول دخول يرتبط الكود بهذا المتصفح على هذا الجهاز.</p>
+      </div>
+      <label>اسم الطالب
+        <input id="studentName" maxlength="80" required placeholder="الاسم الكامل" autocomplete="name">
+      </label>
+      <label>كود التفعيل
+        <input id="activationCode" dir="ltr" maxlength="24" required placeholder="COST-XXXX-XXXX-XXXX" autocomplete="one-time-code">
+      </label>
+      <button id="loginBtn" class="btn primary" type="submit">تفعيل وتسجيل الدخول</button>
+      <div id="loginMsg" class="message hidden"></div>
+      <small class="muted center">يجب فتح الرابط مباشرة في Safari أو Chrome. مسح بيانات المتصفح يتطلب إعادة ربط الكود من المدرس.</small>
+    </form>
+  </section>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand-row"><div class="logo-small">Σ</div><div><b>بنك التكاليف</b><small>نسخة الطالب</small></div></div>
+      <div class="student-card">
+        <span>مرحباً</span>
+        <b id="studentDisplay">طالب</b>
+        <small id="codeDisplay">••••</small>
+      </div>
+      <nav id="chapterNav"></nav>
+      <div class="side-note">لا تشارك كودك. الكود لا يعمل على جهاز ثانٍ.</div>
+      <button id="logoutBtn" class="btn ghost full">تسجيل الخروج</button>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button id="menuBtn" class="icon-btn mobile-only" aria-label="القائمة">☰</button>
+        <div><span class="eyebrow dark">لوحة التدريب</span><h2 id="pageTitle">اختر فصلاً</h2></div>
+        <div class="top-actions"><button id="newExamBtn" class="btn secondary">اختبار جديد</button></div>
+      </header>
+
+      <section id="homePanel">
+        <div class="hero-card">
+          <div><span class="pill">143 سؤالاً</span><h1>تدرّب على محاسبة التكاليف بثقة</h1><p>اختر الفصل وعدد الأسئلة ومستوى الصعوبة، ثم أرسل إجاباتك للتصحيح الآمن في الخادم.</p></div>
+          <div class="hero-metric"><strong id="overallScore">—</strong><span>آخر نتيجة</span></div>
+        </div>
+        <div id="chapterCards" class="chapter-grid"></div>
+      </section>
+
+      <section id="setupPanel" class="panel hidden">
+        <div class="panel-head"><div><span class="eyebrow dark">إعداد الاختبار</span><h2 id="setupChapterTitle"></h2></div></div>
+        <div class="setup-grid">
+          <label>عدد الأسئلة
+            <select id="questionLimit"><option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="50">كل أسئلة الفصل</option></select>
+          </label>
+          <label>الصعوبة
+            <select id="difficulty"><option value="all">جميع المستويات</option><option value="سهل">سهل</option><option value="متوسط">متوسط</option><option value="صعب">صعب</option></select>
+          </label>
+        </div>
+        <button id="startBtn" class="btn primary">بدء الاختبار</button>
+      </section>
+
+      <section id="quizPanel" class="panel hidden">
+        <div class="quiz-head">
+          <div><span id="quizTopic" class="pill"></span><h2 id="quizChapterTitle"></h2></div>
+          <div class="progress-box"><span id="questionCounter">1 / 20</span><div class="progress-track"><i id="progressBar"></i></div></div>
+        </div>
+        <article class="question-card">
+          <div class="question-meta"><span id="questionDifficulty"></span><span id="questionSource"></span></div>
+          <h3 id="questionText"></h3>
+          <div id="optionsBox" class="options"></div>
+        </article>
+        <div class="quiz-controls">
+          <button id="prevBtn" class="btn secondary">السابق</button>
+          <button id="nextBtn" class="btn primary">التالي</button>
+          <button id="submitBtn" class="btn danger hidden">تسليم وتصحيح</button>
+        </div>
+      </section>
+
+      <section id="resultPanel" class="panel hidden">
+        <div class="result-hero"><div class="score-ring"><strong id="scorePercent">0%</strong></div><div><span class="eyebrow dark">نتيجة الاختبار</span><h2 id="scoreText"></h2><p id="scoreMessage" class="muted"></p></div></div>
+        <div id="reviewList" class="review-list"></div>
+        <button id="retryBtn" class="btn primary">اختبار آخر</button>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

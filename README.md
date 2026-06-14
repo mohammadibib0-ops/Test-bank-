@@ -1,57 +1,125 @@
-# TestBank (Professional Version)
+# بنك أسئلة محاسبة التكاليف - نسخة محمية
 
-This project is a secure, sellable test bank web app:
-- Teacher admin dashboard
-- Upload a question set (JSON)
-- Generate access codes
-- Each code is locked to ONE device (server-enforced)
-- Students can take tests on computer or phone (Android/iOS browser)
-- SQLite database included
+تطبيق عربي متجاوب يحتوي على **143 سؤالاً** موزعة على:
 
-## Important (questions)
-This project ships WITHOUT copyrighted question content.
-You can upload your own question set JSON in the Admin panel.
+1. المحاسبة الإدارية: نظرة عامة - 39 سؤالاً.
+2. مفاهيم التكلفة - 50 سؤالاً.
+3. نظام تكاليف أوامر الإنتاج - 54 سؤالاً.
 
-## Quick Start (Small Setup)
+الأسئلة مستخرجة ومصاغة اعتماداً على ملفات المقرر، مع مسائل مشابهة لأمثلة سلوك التكلفة، طريقة الأعلى والأدنى، معدل تحميل التكاليف الصناعية غير المباشرة، تكلفة أمر الإنتاج، تكلفة البضاعة المصنعة والمباعة.
 
-### Option 1: Local (Node installed)
-1) Install **Node.js LTS**
-2) Unzip this folder
-3) Start the server:
-   - Windows: double-click `start_windows.bat`
-   - Mac/Linux: run `./start_mac_linux.sh`
-4) Open `client/index.html` in your browser (or serve it with any static host)
-5) In the top bar, set API Base to: `http://localhost:8080`
+## بنية المشروع
 
-Default admin credentials are in `server/.env` (you can change them).
+- `web/` واجهة الطالب ولوحة المدرس، مناسبة للهاتف والكمبيوتر وتُنشر على GitHub Pages.
+- `worker/` خادم التفعيل والتصحيح باستخدام Cloudflare Workers وD1.
+- ملف بنك الأسئلة لا يُرفع إلى المستودع العام؛ يُستورد من لوحة المدرس مباشرة إلى D1.
+- `worker/schema.sql` جداول الأكواد والأجهزة والجلسات والأسئلة والمحاولات.
 
-### Option 2: Deploy (recommended)
-Host the **server** on any Node host (Render/Fly/Heroku/VPS).
-Host the **client** on any static host (Netlify/Vercel/S3).
-Set `CORS_ORIGIN` in `server/.env` to your client URL.
+## الحماية المطبقة
 
-## Question set JSON format
+- كل كود يُربط في أول تفعيل بمفتاح ECDSA P-256 خاص بالجهاز/المتصفح.
+- المفتاح الخاص غير قابل للاستخراج ومحفوظ في IndexedDB.
+- تسجيل الدخول يتم بتحدٍ مشفر وتوقيع من الجهاز.
+- كل طلب محمي بتوقيع جهاز مستقل، مع وقت وnonce لمنع إعادة الاستخدام.
+- نسخ كود التفعيل أو رمز الجلسة إلى جهاز آخر لا يكفي للدخول.
+- الإجابات الصحيحة والتفسيرات تبقى في قاعدة البيانات ولا تُرسل قبل التسليم، ولا توجد في ملفات GitHub Pages.
+- الأكواد مخزنة في قاعدة البيانات بصيغة HMAC وليست كنص صريح.
+- جلسة طالب واحدة فعالة، ومحاولات محدودة مع قفل مؤقت.
+- لوحة مدرس لإنشاء الأكواد، إيقافها، وإعادة ربط جهاز الطالب.
+- علامة مائية باسم الطالب وآخر أربعة أحرف من الكود.
 
-{
-  "meta": {
-    "durationMinutes": 60,
-    "shuffleQuestions": true,
-    "showScoreAfterSubmit": true
-  },
-  "questions": [
-    {
-      "id": "Q1",
-      "text": "Question text...",
-      "options": ["A", "B", "C", "D"],
-      "correctIndex": 2,
-      "explanation": "optional"
-    }
-  ]
-}
+> لا توجد وسيلة ويب تمنع تصوير الشاشة بكاميرا خارجية أو تضمن منع اللقطات 100%. الحماية هنا تستهدف منع مشاركة الكود، نسخ الجلسة، وفتح البنك على جهاز ثانٍ.
 
-## Teacher admin actions
-- Upload question set JSON
-- Generate codes (copy/paste to students)
-- Reset device lock for a code
-- Disable a code
-- View attempts
+## الإعداد لأول مرة
+
+### 1) إنشاء قاعدة Cloudflare D1
+
+من مجلد `worker`:
+
+```bash
+npm install
+npx wrangler login
+npx wrangler d1 create cost-question-bank
+```
+
+انسخ `database_id` الناتج إلى `worker/wrangler.toml` بدل:
+
+```toml
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+```
+
+ثم أنشئ الجداول:
+
+```bash
+npx wrangler d1 execute cost-question-bank --remote --file=schema.sql
+```
+
+### 2) إضافة الأسرار
+
+استخدم القيم الموجودة في الملف الخاص الذي تم تسليمه لك خارج GitHub: `cost-bank-cloudflare-secrets.txt`.
+
+```bash
+npx wrangler secret put CODE_PEPPER
+npx wrangler secret put SESSION_SECRET
+npx wrangler secret put ADMIN_PASSWORD
+```
+
+لا ترفع ملف الأسرار إلى GitHub ولا ترسله للطلاب.
+
+### 3) نشر الخادم
+
+في `worker/wrangler.toml` اضبط:
+
+```toml
+ALLOWED_ORIGIN = "https://mohammadibib0-ops.github.io"
+```
+
+ثم:
+
+```bash
+npx wrangler deploy
+```
+
+انسخ رابط الـ Worker، ثم ضعه في `web/config.js`:
+
+```js
+API_BASE: 'https://اسم-الخادم.workers.dev'
+```
+
+### 4) نشر واجهة GitHub Pages
+
+1. ادفع التعديلات إلى فرع `main`.
+2. افتح `Settings` ثم `Pages`.
+3. اختر **GitHub Actions** كمصدر النشر.
+4. سير العمل `.github/workflows/pages.yml` ينشر محتويات `web/` تلقائياً.
+
+رابط الطالب سيكون عادة:
+
+```text
+https://mohammadibib0-ops.github.io/Test-bank-/
+```
+
+ولوحة المدرس:
+
+```text
+https://mohammadibib0-ops.github.io/Test-bank-/admin.html
+```
+
+### 5) استيراد الأسئلة وإنشاء الأكواد
+
+1. افتح `admin.html`.
+2. سجل الدخول بكلمة `ADMIN_PASSWORD` الموجودة في ملف الأسرار.
+3. اختر ملف `cost-question-bank-143.json` الذي تم تسليمه لك، ثم اضغط **استيراد بنك الأسئلة** مرة واحدة.
+4. أنشئ دفعة أكواد، ثم نزّل ملف CSV واحتفظ به.
+5. أرسل لكل طالب كوداً واحداً فقط.
+
+## تغيير جهاز طالب
+
+من لوحة المدرس اضغط **إعادة ربط** بجانب الكود. سيُحذف مفتاح الجهاز السابق وتُلغى جلساته، ثم يستطيع الطالب تفعيل الكود على الجهاز الجديد.
+
+## ملاحظات للطلاب
+
+- افتح الرابط مباشرة في Safari أو Chrome، وليس داخل متصفح واتساب أو تطبيقات التواصل.
+- لا تستخدم الوضع الخاص/الخفي.
+- لا تمسح بيانات الموقع؛ مسحها يحذف مفتاح الجهاز ويستلزم إعادة الربط من المدرس.
+- الكود مصمم لجهاز ومتصفح واحد.
