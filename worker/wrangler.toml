@@ -3,9 +3,9 @@ main = "src/index.js"
 compatibility_date = "2026-06-01"
 
 [vars]
-ALLOWED_ORIGIN = "https://YOUR-GITHUB-USERNAME.github.io"
+ALLOWED_ORIGIN = "https://mohammadibib0-ops.github.io"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "cost-question-bank"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "6bc4f1b2-f7fa-43d9-8a68-f40f11dd59c6"
