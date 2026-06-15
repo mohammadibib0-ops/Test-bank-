@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_license ON sessions(license_id);
-
+CREATE INDEX IF NOT EXISTS idx_sessions_seen ON sessions(last_seen_at);
 
 CREATE TABLE IF NOT EXISTS request_nonces (
   nonce_hash TEXT PRIMARY KEY,
@@ -85,6 +85,26 @@ CREATE TABLE IF NOT EXISTS attempts (
   FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_attempts_license ON attempts(license_id,created_at);
+
+CREATE TABLE IF NOT EXISTS student_activity (
+  license_id INTEGER PRIMARY KEY,
+  last_logout_at TEXT,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS student_question_progress (
+  license_id INTEGER NOT NULL,
+  question_id TEXT NOT NULL,
+  first_answered_at TEXT NOT NULL,
+  last_answered_at TEXT NOT NULL,
+  times_answered INTEGER NOT NULL DEFAULT 1,
+  best_correct INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (license_id, question_id),
+  FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE CASCADE,
+  FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_student_progress_license ON student_question_progress(license_id);
 
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
