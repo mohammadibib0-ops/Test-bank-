@@ -1,11 +1,13 @@
 const CONFIG = window.COST_BANK_CONFIG || {};
 const API_BASE = String(CONFIG.API_BASE || '').replace(/\/$/, '');
 const ADMIN_TOKEN_KEY = 'cost_bank_admin_session_v1';
-const AUTO_REFRESH_MS = 60 * 1000;
+const AUTO_REFRESH_MS = 90 * 1000;
+const REQUEST_TIMEOUT_MS = 15000;
 
 let token = sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
 let latestCodes = [];
 let refreshTimer = null;
+let isRefreshing = false;
 
 const $ = id => document.getElementById(id);
 
@@ -24,7 +26,7 @@ function toast(text) {
   element.textContent = text;
   element.classList.remove('hidden');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => element.classList.add('hidden'), 3000);
+  toast.timer = setTimeout(() => element.classList.add('hidden'), 3500);
 }
 
 function msg(id, text, type='error') {
@@ -37,38 +39,48 @@ function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('ar-JO', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return date.toLocaleString('ar-JO', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-async function api(path, { method='GET', body=null, auth=true }={}) {
+async function api(path, { method='GET', body=null, auth=true, timeout=REQUEST_TIMEOUT_MS }={}) {
   if (!API_BASE || API_BASE.includes('YOUR-WORKER')) {
     throw new Error('اضبط API_BASE في config.js أولاً.');
   }
 
-  const headers = { 'Content-Type': 'application/json' };
-  if (auth) headers.Authorization = `Bearer ${token}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body === null ? null : JSON.stringify(body),
-    cache: 'no-store',
-  });
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth) headers.Authorization = `Bearer ${token}`;
 
-  const data = await response.json().catch(() => ({}));
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body === null ? null : JSON.stringify(body),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const error = new Error(data.message || 'فشل الطلب');
-    error.code = data.error;
-    error.status = response.status;
-    if (response.status === 401 && auth) logout(false);
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const error = new Error(data.message || 'فشل الطلب');
+      error.code = data.error;
+      error.status = response.status;
+      if (response.status === 401 && auth) logout(false);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('استغرق تحميل البيانات وقتاً طويلاً. اضغط تحديث الآن وحاول مرة أخرى.');
+    }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return data;
 }
 
 async function login(event) {
@@ -86,7 +98,7 @@ async function login(event) {
 
     token = data.token;
     sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
-    await enter();
+    enter();
   } catch (error) {
     msg('adminLoginMsg', error.message);
   } finally {
@@ -95,10 +107,10 @@ async function login(event) {
   }
 }
 
-async function enter() {
+function enter() {
   $('adminLogin').classList.add('hidden');
   $('adminApp').classList.remove('hidden');
-  await refreshDashboard();
+  refreshDashboard(false);
 
   clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
@@ -114,17 +126,30 @@ function logout(reload=true) {
 }
 
 async function refreshDashboard(showError=true) {
+  if (isRefreshing) return;
+  isRefreshing = true;
+
+  const button = $('refreshBtn');
+  button.disabled = true;
+  button.textContent = 'جاري التحديث...';
+  $('studentsSummary').textContent = 'جاري تحديث بيانات الطلاب…';
+
   try {
     await Promise.all([loadStats(), loadCodes()]);
     $('lastRefresh').textContent = `آخر تحديث: ${new Date().toLocaleTimeString('ar-JO')}`;
   } catch (error) {
+    $('studentsSummary').textContent = `تعذر تحميل البيانات: ${error.message}`;
+    $('studentsCards').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     if (showError) toast(error.message);
+  } finally {
+    isRefreshing = false;
+    button.disabled = false;
+    button.textContent = 'تحديث الآن';
   }
 }
 
 async function loadStats() {
   const stats = await api('/api/admin/stats');
-
   const items = [
     ['الطلاب المتصلون الآن', stats.onlineStudents],
     ['إجمالي الأكواد', stats.totalCodes],
@@ -144,7 +169,6 @@ async function loadStats() {
 
 async function seed() {
   const file = $('bankFile').files?.[0];
-
   if (!file) {
     msg('seedMsg', 'اختر ملف بنك الأسئلة JSON أولاً.');
     return;
@@ -156,11 +180,7 @@ async function seed() {
 
   try {
     const bank = JSON.parse(await file.text());
-    const data = await api('/api/admin/seed', {
-      method: 'POST',
-      body: { bank },
-    });
-
+    const data = await api('/api/admin/seed', { method: 'POST', body: { bank }, timeout: 30000 });
     msg('seedMsg', `تم استيراد ${data.imported} سؤالاً - الإصدار ${data.version}`, 'ok');
     await loadStats();
   } catch (error) {
@@ -183,11 +203,7 @@ async function generate() {
   try {
     const data = await api('/api/admin/codes', {
       method: 'POST',
-      body: {
-        count,
-        label,
-        expiresAt: expiry ? new Date(expiry).toISOString() : null,
-      },
+      body: { count, label, expiresAt: expiry ? new Date(expiry).toISOString() : null },
     });
 
     latestCodes = data.codes;
@@ -205,26 +221,18 @@ async function generate() {
 
 function downloadCodes() {
   if (!latestCodes.length) return;
-
   const label = $('codeLabel').value.trim();
-  const csv = [
-    'code,label',
-    ...latestCodes.map(code => `"${code}","${label.replaceAll('"','""')}"`),
-  ].join('\n');
-
+  const csv = ['code,label', ...latestCodes.map(code => `"${code}","${label.replaceAll('"','""')}"`)].join('\n');
   const anchor = document.createElement('a');
-  anchor.href = URL.createObjectURL(new Blob(['\ufeff' + csv], {
-    type: 'text/csv;charset=utf-8',
-  }));
+  anchor.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
   anchor.download = `activation-codes-${new Date().toISOString().slice(0,10)}.csv`;
   anchor.click();
   URL.revokeObjectURL(anchor.href);
 }
 
-function progressCell(row) {
+function progressBlock(row) {
   const progress = Number(row.progress_percent || 0);
   const answered = Number(row.unique_questions || 0);
-
   return `
     <div class="student-progress" title="${answered} سؤالاً مختلفاً تمت الإجابة عنه">
       <div class="progress-label"><b>${progress}%</b><small>${answered} سؤال</small></div>
@@ -233,14 +241,24 @@ function progressCell(row) {
   `;
 }
 
+function field(label, value) {
+  return `<div class="student-field"><span>${label}</span><strong>${value}</strong></div>`;
+}
+
 async function loadCodes() {
-  const data = await api('/api/admin/codes?limit=500');
-  const tbody = $('codesTable');
-  tbody.innerHTML = '';
+  const data = await api('/api/admin/codes?limit=100');
+  const container = $('studentsCards');
+  container.innerHTML = '';
+
+  if (!Array.isArray(data.licenses) || !data.licenses.length) {
+    container.innerHTML = '<div class="empty-state">لا توجد أكواد أو طلاب حتى الآن.</div>';
+    $('studentsSummary').textContent = 'لا توجد بيانات طلاب لعرضها.';
+    return;
+  }
 
   for (const row of data.licenses) {
-    const tr = document.createElement('tr');
-    if (row.is_online) tr.classList.add('online-row');
+    const card = document.createElement('article');
+    card.className = `student-admin-card ${row.is_online ? 'online-card' : ''}`;
 
     const device = row.device_fingerprint
       ? `${String(row.device_fingerprint).slice(0,8)}…`
@@ -248,53 +266,52 @@ async function loadCodes() {
 
     const online = row.student_name
       ? `<span class="presence-chip ${row.is_online ? 'online' : 'offline'}">${row.is_online ? 'متصل الآن' : 'غير متصل'}</span>`
-      : '—';
+      : '<span class="presence-chip offline">غير مفعّل</span>';
 
-    tr.innerHTML = `
-      <td>${Number(row.id)}</td>
-      <td dir="ltr">••••-${escapeHtml(row.code_hint)}</td>
-      <td>${escapeHtml(row.label || '—')}</td>
-      <td><b>${escapeHtml(row.student_name || '—')}</b></td>
-      <td>${online}</td>
-      <td>${progressCell(row)}</td>
-      <td><b>${Number(row.average_score || 0)}%</b></td>
-      <td>${Number(row.attempts_count || 0)}</td>
-      <td>${formatDate(row.last_login_at)}</td>
-      <td>${formatDate(row.last_seen_at)}</td>
-      <td>${formatDate(row.last_logout_at)}</td>
-      <td class="device-short">${escapeHtml(device)}</td>
-      <td><span class="status-chip ${escapeHtml(row.status)}">${row.status === 'active' ? 'فعال' : 'موقوف'}</span></td>
-      <td>
-        <div class="row-actions">
-          <button data-reset>إعادة ربط</button>
-          <button data-toggle class="${row.status === 'active' ? 'warn' : ''}">
-            ${row.status === 'active' ? 'إيقاف' : 'تفعيل'}
-          </button>
+    const status = `<span class="status-chip ${escapeHtml(row.status)}">${row.status === 'active' ? 'فعال' : 'موقوف'}</span>`;
+
+    card.innerHTML = `
+      <div class="student-card-head">
+        <div>
+          <h3>${escapeHtml(row.student_name || 'كود غير مستخدم')}</h3>
+          <small>رقم السجل: ${Number(row.id)}</small>
         </div>
-      </td>
+        ${online}
+      </div>
+
+      <div class="student-fields">
+        ${field('الكود', `<span dir="ltr">••••-${escapeHtml(row.code_hint)}</span>`)}
+        ${field('الدفعة', escapeHtml(row.label || '—'))}
+        ${field('نسبة التقدم', progressBlock(row))}
+        ${field('متوسط الدرجات', `${Number(row.average_score || 0)}%`)}
+        ${field('عدد المحاولات', Number(row.attempts_count || 0))}
+        ${field('آخر دخول', formatDate(row.last_login_at))}
+        ${field('آخر نشاط', formatDate(row.last_seen_at))}
+        ${field('آخر خروج', formatDate(row.last_logout_at))}
+        ${field('الجهاز', `<span dir="ltr">${escapeHtml(device)}</span>`)}
+        ${field('حالة الكود', status)}
+      </div>
+
+      <div class="student-actions">
+        <button data-reset>إعادة ربط</button>
+        <button data-toggle class="${row.status === 'active' ? 'warn' : ''}">${row.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
+      </div>
     `;
 
-    tr.querySelector('[data-reset]').onclick = () => resetCode(row.id, row.student_name);
-    tr.querySelector('[data-toggle]').onclick = () => toggleCode(row.id);
-    tbody.appendChild(tr);
+    card.querySelector('[data-reset]').onclick = () => resetCode(row.id, row.student_name);
+    card.querySelector('[data-toggle]').onclick = () => toggleCode(row.id);
+    container.appendChild(card);
   }
 
-  $('studentsSummary').textContent = `يعرض ${data.licenses.length} كوداً — المتصل الآن يُحدّد من النشاط خلال آخر ${Math.round(Number(data.onlineWindowSeconds || 180) / 60)} دقائق.`;
+  $('studentsSummary').textContent = `تم عرض ${data.licenses.length} كوداً. حالة الاتصال تعتمد على النشاط خلال آخر ${Math.round(Number(data.onlineWindowSeconds || 180) / 60)} دقائق.`;
 }
 
 async function resetCode(id, name) {
   const studentText = name ? ` للطالب ${name}` : '';
-
-  if (!confirm(`سيتم فصل الجهاز ومسح سجل التقدم والمحاولات${studentText}. متابعة؟`)) {
-    return;
-  }
+  if (!confirm(`سيتم فصل الجهاز ومسح سجل التقدم والمحاولات${studentText}. متابعة؟`)) return;
 
   try {
-    await api(`/api/admin/codes/${id}/reset`, {
-      method: 'POST',
-      body: {},
-    });
-
+    await api(`/api/admin/codes/${id}/reset`, { method: 'POST', body: {} });
     toast('تمت إعادة ربط الكود ومسح بيانات الطالب السابقة');
     await refreshDashboard(false);
   } catch (error) {
@@ -304,10 +321,7 @@ async function resetCode(id, name) {
 
 async function toggleCode(id) {
   try {
-    await api(`/api/admin/codes/${id}/toggle`, {
-      method: 'POST',
-      body: {},
-    });
+    await api(`/api/admin/codes/${id}/toggle`, { method: 'POST', body: {} });
     await refreshDashboard(false);
   } catch (error) {
     toast(error.message);
@@ -321,6 +335,4 @@ $('downloadCodes').onclick = downloadCodes;
 $('refreshBtn').onclick = () => refreshDashboard();
 $('adminLogout').onclick = () => logout(true);
 
-if (token) {
-  enter().catch(() => logout(true));
-}
+if (token) enter();

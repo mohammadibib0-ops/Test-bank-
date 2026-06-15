@@ -7,6 +7,10 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>بنك أسئلة محاسبة التكاليف</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .owner-name{display:inline-flex;align-items:center;gap:7px;margin-top:10px;padding:8px 13px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-weight:900}
+    .owner-name-dark{display:inline-flex;margin-top:10px;padding:7px 11px;border-radius:999px;background:#e6f3f1;color:#126f68;font-weight:900;font-size:13px}
+  </style>
 </head>
 <body>
   <div id="securityCurtain" class="security-curtain hidden"><div>تم إخفاء المحتوى مؤقتاً</div></div>
@@ -18,6 +22,7 @@
       <span class="eyebrow">محاسبة التكاليف</span>
       <h1>بنك أسئلة تفاعلي<br>محمي بجهاز الطالب</h1>
       <p>ثلاثة فصول، أسئلة مفاهيمية ومسائل حسابية، وتصحيح فوري بعد تسليم الاختبار.</p>
+      <div class="owner-name">إعداد: محمد ابراهيم</div>
       <div class="security-list">
         <span>🔐 مفتاح جهاز غير قابل للاستخراج</span>
         <span>🧩 كود واحد لجهاز واحد</span>
@@ -44,7 +49,7 @@
 
   <div id="appView" class="app-shell hidden">
     <aside class="sidebar">
-      <div class="brand-row"><div class="logo-small">Σ</div><div><b>بنك التكاليف</b><small>نسخة الطالب</small></div></div>
+      <div class="brand-row"><div class="logo-small">Σ</div><div><b>بنك التكاليف</b><small>إعداد: محمد ابراهيم</small></div></div>
       <div class="student-card">
         <span>مرحباً</span>
         <b id="studentDisplay">طالب</b>
@@ -64,7 +69,7 @@
 
       <section id="homePanel">
         <div class="hero-card">
-          <div><span class="pill">143 سؤالاً</span><h1>تدرّب على محاسبة التكاليف بثقة</h1><p>اختر الفصل وعدد الأسئلة ومستوى الصعوبة، ثم أرسل إجاباتك للتصحيح الآمن في الخادم.</p></div>
+          <div><span class="pill">143 سؤالاً</span><h1>تدرّب على محاسبة التكاليف بثقة</h1><p>اختر الفصل وعدد الأسئلة ومستوى الصعوبة، ثم أرسل إجاباتك للتصحيح الآمن في الخادم.</p><span class="owner-name-dark">إعداد: محمد ابراهيم</span></div>
           <div class="hero-metric"><strong id="overallScore">—</strong><span>آخر نتيجة</span></div>
         </div>
         <div id="chapterCards" class="chapter-grid"></div>
@@ -85,7 +90,7 @@
 
       <section id="quizPanel" class="panel hidden">
         <div class="quiz-head">
-          <div><span id="quizTopic" class="pill"></span><h2 id="quizChapterTitle"></h2></div>
+          <div><span id="quizTopic" class="pill"></span><h2 id="quizChapterTitle"></h2><p class="muted">إعداد: <strong>محمد ابراهيم</strong></p></div>
           <div class="progress-box"><span id="questionCounter">1 / 20</span><div class="progress-track"><i id="progressBar"></i></div></div>
         </div>
         <article class="question-card">
