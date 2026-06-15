@@ -703,7 +703,7 @@ async function createCodes(request, env) {
 }
 
 async function listCodes(url, env) {
-  const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 200)));
+  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') || 100)));
   const totalQuestionsRow = await env.DB.prepare(`
     SELECT COUNT(*) AS count FROM questions WHERE active=1
   `).first();
@@ -713,19 +713,48 @@ async function listCodes(url, env) {
   const onlineCutoff = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
 
   const rows = await env.DB.prepare(`
+    WITH selected AS (
+      SELECT
+        id,code_hint,label,student_name,device_fingerprint,status,
+        activated_at,last_login_at,expires_at,failed_attempts,
+        locked_until,created_at
+      FROM licenses
+      ORDER BY
+        CASE WHEN student_name IS NOT NULL THEN 0 ELSE 1 END,
+        id DESC
+      LIMIT ?
+    ),
+    session_summary AS (
+      SELECT
+        license_id,
+        MAX(last_seen_at) AS last_seen_at,
+        MAX(expires_at) AS session_expires_at
+      FROM sessions
+      WHERE license_id IN (SELECT id FROM selected)
+      GROUP BY license_id
+    ),
+    progress_summary AS (
+      SELECT
+        license_id,
+        COUNT(*) AS unique_questions,
+        SUM(best_correct) AS best_correct
+      FROM student_question_progress
+      WHERE license_id IN (SELECT id FROM selected)
+      GROUP BY license_id
+    ),
+    attempt_summary AS (
+      SELECT
+        license_id,
+        COUNT(*) AS attempts_count,
+        SUM(score) AS correct_total,
+        SUM(total) AS answer_total,
+        MAX(created_at) AS last_attempt_at
+      FROM attempts
+      WHERE license_id IN (SELECT id FROM selected)
+      GROUP BY license_id
+    )
     SELECT
-      l.id,
-      l.code_hint,
-      l.label,
-      l.student_name,
-      l.device_fingerprint,
-      l.status,
-      l.activated_at,
-      l.last_login_at,
-      l.expires_at,
-      l.failed_attempts,
-      l.locked_until,
-      l.created_at,
+      l.*,
       a.last_logout_at,
       s.last_seen_at,
       s.session_expires_at,
@@ -742,37 +771,13 @@ async function listCodes(url, env) {
       COALESCE(t.correct_total,0) AS correct_total,
       COALESCE(t.answer_total,0) AS answer_total,
       t.last_attempt_at
-    FROM licenses l
+    FROM selected l
     LEFT JOIN student_activity a ON a.license_id=l.id
-    LEFT JOIN (
-      SELECT
-        license_id,
-        MAX(last_seen_at) AS last_seen_at,
-        MAX(expires_at) AS session_expires_at
-      FROM sessions
-      GROUP BY license_id
-    ) s ON s.license_id=l.id
-    LEFT JOIN (
-      SELECT
-        license_id,
-        COUNT(*) AS unique_questions,
-        SUM(best_correct) AS best_correct
-      FROM student_question_progress
-      GROUP BY license_id
-    ) p ON p.license_id=l.id
-    LEFT JOIN (
-      SELECT
-        license_id,
-        COUNT(*) AS attempts_count,
-        SUM(score) AS correct_total,
-        SUM(total) AS answer_total,
-        MAX(created_at) AS last_attempt_at
-      FROM attempts
-      GROUP BY license_id
-    ) t ON t.license_id=l.id
+    LEFT JOIN session_summary s ON s.license_id=l.id
+    LEFT JOIN progress_summary p ON p.license_id=l.id
+    LEFT JOIN attempt_summary t ON t.license_id=l.id
     ORDER BY is_online DESC,l.id DESC
-    LIMIT ?
-  `).bind(onlineCutoff, now, limit).all();
+  `).bind(limit, onlineCutoff, now).all();
 
   const licenses = (rows.results || []).map(row => ({
     ...row,
